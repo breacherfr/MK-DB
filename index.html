@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>OSINT_SYSTEM // MANUAL_LOAD</title>
+    <title>OSINT_SYSTEM // VERCEL_HOSTED</title>
     <style>
         :root {
             --cyan: #00eaff; --dark-blue: #001a20; --black: #050505;
@@ -11,122 +11,110 @@
         body { background-color: var(--black); color: var(--cyan); font-family: 'Consolas', monospace; margin: 0; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
         .container { width: 90%; max-width: 800px; padding: 40px 0; }
         
-        /* Style du bouton de chargement */
-        .load-zone {
-            border: 2px dashed var(--cyan);
-            padding: 20px;
-            text-align: center;
-            margin-bottom: 20px;
-            background: rgba(0, 234, 255, 0.05);
+        .warning-strip { border: 1px solid var(--warning); padding: 10px; margin-bottom: 20px; text-align: center; font-size: 0.8rem; }
+
+        .search-box { 
+            width: 100%; background: var(--dark-blue); border: 1px solid var(--cyan); 
+            padding: 15px; color: #fff; outline: none; box-sizing: border-box; 
+            font-family: inherit; font-size: 1.1rem;
         }
         
-        input[type="file"] { display: none; }
-        .custom-file-upload {
-            background: var(--cyan);
-            color: #000;
-            padding: 10px 20px;
-            cursor: pointer;
-            font-weight: bold;
-            display: inline-block;
-            margin-top: 10px;
-        }
-
-        .search-box { width: 100%; background: var(--dark-blue); border: 1px solid var(--cyan); padding: 15px; color: #fff; outline: none; box-sizing: border-box; display: none; }
-        .entry { background: rgba(0, 30, 40, 0.3); border-left: 4px solid var(--cyan); margin-top: 20px; padding: 20px; }
-        .entry-content { color: var(--text-gray); white-space: pre-wrap; font-size: 0.9rem; }
+        .entry { background: rgba(0, 30, 40, 0.3); border-left: 4px solid var(--cyan); margin-top: 20px; padding: 20px; border-bottom: 1px solid rgba(0,234,255,0.05); }
+        .entry-content { color: var(--text-gray); white-space: pre-wrap; font-size: 0.9rem; line-height: 1.5; }
         .redacted { background: var(--cyan); color: var(--cyan); user-select: none; }
-        #status { font-size: 0.8rem; margin: 10px 0; color: var(--warning); }
+        .is-censored { border-left-color: var(--danger); }
+        
+        #status { font-size: 0.7rem; margin-top: 8px; color: var(--text-gray); letter-spacing: 1px; }
+        
+        /* Animation de chargement */
+        .loading-blink { animation: blink 1s infinite; }
+        @keyframes blink { 50% { opacity: 0; } }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>OSINT_LOADER // LOCAL_ACCESS</h1>
+    <h1 style="text-shadow: 0 0 10px var(--cyan);">OSINT_DATABASE_v2</h1>
     
-    <div id="loadZone" class="load-zone">
-        <div>SÉCURITÉ NAVIGATEUR : CHARGEMENT MANUEL REQUIS</div>
-        <label for="file-upload" class="custom-file-upload">
-            📁 SÉLECTIONNER LE FICHIER "a.json"
-        </label>
-        <input id="file-upload" type="file" accept=".json"/>
+    <div class="warning-strip">
+        <b style="color:var(--warning)">[ ACCÈS SÉCURISÉ ]</b><br>
+        Toute requête effectuée depuis l'IP publique est enregistrée dans les logs système.
     </div>
 
-    <input type="text" id="search" class="search-box" placeholder="RECHERCHER DANS LES 15 MO DE DONNÉES...">
-    <div id="status">EN ATTENTE DU FICHIER JSON...</div>
+    <input type="text" id="search" class="search-box" placeholder="INITIALISATION DES DONNÉES..." disabled>
+    <div id="status" class="loading-blink">CONNEXION AU FICHIER CENTRAL (15MB)...</div>
 
     <div id="results"></div>
 </div>
 
 <script>
     let db = [];
-    const BLACKLIST = ["Dubois", "Hacker"];
+    const BLACKLIST = ["Dubois", "Hacker"]; // Noms à censurer
 
-    const fileUpload = document.getElementById('file-upload');
     const searchInput = document.getElementById('search');
     const resultsDiv = document.getElementById('results');
     const statusDiv = document.getElementById('status');
-    const loadZone = document.getElementById('loadZone');
 
-    // --- LECTURE DU FICHIER PAR L'UTILISATEUR ---
-    fileUpload.addEventListener('change', function(e) {
-        const file = e.target.files[0];
-        if (!file) return;
+    // --- CHARGEMENT AUTO DEPUIS VERCEL ---
+    async function loadData() {
+        try {
+            const response = await fetch('a.json'); 
+            if (!response.ok) throw new Error("Fichier introuvable sur le serveur");
+            
+            db = await response.json();
+            
+            statusDiv.classList.remove('loading-blink');
+            statusDiv.innerText = `DATABASE ONLINE - ${db.length} ENTRÉES CHARGÉES`;
+            statusDiv.style.color = "var(--cyan)";
+            
+            searchInput.disabled = false;
+            searchInput.placeholder = "RECHERCHER UN NOM, UNE VILLE, UNE INFO...";
+            searchInput.focus();
+        } catch (err) {
+            statusDiv.innerText = "ERREUR CRITIQUE : IMPOSSIBLE DE CHARGER LA BASE.";
+            statusDiv.style.color = "var(--danger)";
+            console.error(err);
+        }
+    }
 
-        statusDiv.innerText = "LECTURE DU FICHIER EN COURS... PATIENTEZ.";
-        
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            try {
-                db = JSON.parse(e.target.result);
-                statusDiv.innerText = `SYSTÈME ONLINE - ${db.length} ENTRÉES CHARGÉES`;
-                statusDiv.style.color = "var(--cyan)";
-                
-                // On cache le bouton et on montre la barre de recherche
-                loadZone.style.display = 'none';
-                searchInput.style.display = 'block';
-                searchInput.focus();
-            } catch (err) {
-                statusDiv.innerText = "ERREUR : FORMAT JSON INVALIDE.";
-                statusDiv.style.color = "var(--danger)";
-            }
-        };
-        reader.readAsText(file);
-    });
-
-    // --- RECHERCHE ---
+    // --- LOGIQUE DE RECHERCHE ---
     searchInput.addEventListener('input', function() {
         const query = this.value.toLowerCase().trim();
         resultsDiv.innerHTML = '';
         if (query.length < 2) return;
 
         const matches = db.filter(item => {
-            const content = (item.nom + " " + (item.prenom || "") + " " + (item.infos || "")).toLowerCase();
-            return content.includes(query);
+            const pool = (item.nom + " " + (item.prenom || "") + " " + (item.infos || "")).toLowerCase();
+            return pool.includes(query);
         });
 
-        matches.slice(0, 50).forEach(item => { // Limite à 50 résultats pour la fluidité
+        // On affiche les 50 premiers pour garder le site super rapide
+        matches.slice(0, 50).forEach(item => {
             const isCensored = BLACKLIST.some(name => 
                 (item.nom && item.nom.toLowerCase().includes(name.toLowerCase())) || 
                 (item.prenom && item.prenom.toLowerCase().includes(name.toLowerCase()))
             );
 
-            const entryDiv = document.createElement('div');
-            entryDiv.className = `entry ${isCensored ? 'is-censored' : ''}`;
+            const div = document.createElement('div');
+            div.className = `entry ${isCensored ? 'is-censored' : ''}`;
 
-            const displayContent = isCensored 
-                ? `<span style="color:var(--danger)">[ CLASSIFIÉ ]</span><br><span class="redacted">` + "█".repeat(100) + `</span>` 
-                : (item.infos || "Aucune information supplémentaire.");
+            const content = isCensored 
+                ? `<span style="color:var(--danger)">[ DONNÉES CLASSIFIÉES - NIVEAU 4 REQUIS ]</span><br><span class="redacted">` + "█".repeat(120) + `</span>` 
+                : (item.infos || "Aucune donnée.");
 
-            entryDiv.innerHTML = `
-                <div style="display:flex; justify-content:space-between; border-bottom:1px solid rgba(0,234,255,0.1); padding-bottom:5px; margin-bottom:10px;">
-                    <div style="font-weight:bold">${(item.nom || "NOM").toUpperCase()} ${(item.prenom || "PRÉNOM").toUpperCase()}</div>
-                    <div style="font-size:0.7rem; border:1px solid; padding:2px 5px">${item.statut || "N/A"}</div>
+            div.innerHTML = `
+                <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                    <b style="font-size:1.1rem">${(item.nom || "").toUpperCase()} ${(item.prenom || "").toUpperCase()}</b>
+                    <span style="border:1px solid; padding:2px 6px; font-size:0.7rem">${item.statut || "NORMAL"}</span>
                 </div>
-                <div class="entry-content">${displayContent}</div>
+                <div class="entry-content">${content}</div>
+                <div style="margin-top:10px; font-size:0.6rem; opacity:0.4">CLASSE: ${item.classe || "NON DÉFINIE"}</div>
             `;
-            resultsDiv.appendChild(entryDiv);
+            resultsDiv.appendChild(div);
         });
     });
+
+    loadData();
 </script>
 
 </body>
